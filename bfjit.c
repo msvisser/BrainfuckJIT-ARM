@@ -181,7 +181,6 @@ void rle_code_generate(unsigned char character, unsigned int count, void *param)
 }
 
 int main(int argc, char *argv[]) {
-	/* unsigned int i; */
 	/* Input variables */
 	FILE *input_file;
 	/* JIT variables */
@@ -231,7 +230,7 @@ int main(int argc, char *argv[]) {
 	printf("Compiling code into machine code\n");
 	/* Add the preamble code to the memory */
     *code_memory_pointer++ = (unsigned int) jit_memory;
-    *code_memory_pointer++ = 0xe92d4890; /* push {r4, r5, fp, lr} */
+    *code_memory_pointer++ = 0xe92d4890; /* push {r4, r7, fp, lr} */
     *code_memory_pointer++ = 0xe1a0b00d; /* mov fp, sp */
     *code_memory_pointer++ = 0xe51f4014; /* ldr r4, [pc, #-20] */
     *code_memory_pointer++ = 0xe5d40000; /* ldrb r0, [r4] */
@@ -254,10 +253,6 @@ int main(int argc, char *argv[]) {
     /* Call the JIT generated code */
     jit_function = (jit_function_t) (code_memory + 1);
     jit_function();
-
-    /* for (i = 0; i < code_length / 4; i++) {
-    	printf("%08x\n", *(code_memory + i));
-    } */
 
 	/* Deallocate the code and data memory */
 	munmap(code_memory, code_length);
