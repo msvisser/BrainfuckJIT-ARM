@@ -123,7 +123,7 @@ void rle_code_generate(unsigned char character, unsigned int count, void *param)
 		/* "[].," need to be repeated for every character */
 		case '[':
 			for (i = 0; i < count; i++) {
-				*(code_memory + (i * 2) + 0) = 0xe3500000; /* cmp r0, #0 */
+				*(code_memory + (i * 2) + 0) = 0xe31000ff; /* tst r0, #255 */
 				*(code_memory + (i * 2) + 1) = 0x0a000000; /* beq offset */
 
 				/* Save the memory address of the branch instruction on the stack, so we
@@ -145,7 +145,7 @@ void rle_code_generate(unsigned char character, unsigned int count, void *param)
 				back_offset = ((unsigned int) back_addr - (unsigned int) cur_addr - 4) >> 2;
 				forward_offset = ((unsigned int) cur_addr - (unsigned int) back_addr - 4) >> 2;
 
-				*(code_memory + (i * 2) + 0) = 0xe3500000; /* cmp r0, #0 */
+				*(code_memory + (i * 2) + 0) = 0xe31000ff; /* tst r0, #255 */
 				*(code_memory + (i * 2) + 1) = 0x1a000000 | (back_offset & 0xffffff); /* bne offset */
 				*((unsigned int *) back_addr) |= (forward_offset & 0xffffff);
 			}
