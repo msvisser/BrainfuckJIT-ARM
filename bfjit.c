@@ -206,7 +206,7 @@ int main(int argc, char *argv[]) {
     rle_read_file(input_file, rle_determine_code_length, &code_length);
 
     /* Increase the code length to allow for pre- and postamble */
-    code_length += 9 * sizeof(unsigned int);
+    code_length += 8 * sizeof(unsigned int);
 
     printf("Allocating memory for the output code\n");
     /* Allocate code memory which is writable and executable */     
@@ -246,7 +246,6 @@ int main(int argc, char *argv[]) {
     /* Add the postamble code to the memory */  
     *code_memory_pointer++ = 0xe1a0d00b; /* mov sp, fp */
     *code_memory_pointer++ = 0xe8bd4890; /* pop {r4, r7, fp, lr} */
-    *code_memory_pointer++ = 0xe3a00000; /* mov r0, #0 */
     *code_memory_pointer++ = 0xe12fff1e; /* bx lr */
 
     printf("Running the generated code!\n\n");
