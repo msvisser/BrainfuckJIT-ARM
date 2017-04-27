@@ -19,7 +19,7 @@ typedef void (*jit_function_t)(void);
 /* Structure for passing the code generation data to the RLE function */
 typedef struct {
     unsigned int **code_memory_pointer;
-    unsigned int *loop_stack[LOOP_STACK_SIZE];
+    unsigned int **loop_stack;
     unsigned int loop_size;
 } codegen_param_t;
 
@@ -132,7 +132,7 @@ void rle_code_generate(unsigned char character, unsigned int count, void *param)
                 /* Save the memory address of the branch instruction on the stack, so we
                    can fix the offset when we find the closing bracket */
                 if (codegen_param->loop_size >= LOOP_STACK_SIZE) exit(3);
-                codegen_param->loop_stack[codegen_param->loop_size++] = (code_memory + (i * 2) + 1);
+                *(codegen_param->loop_stack + codegen_param->loop_size++) = (code_memory + (i * 2) + 1);
             }
             *code_memory_pointer += 2 * count;
             break;
@@ -141,7 +141,7 @@ void rle_code_generate(unsigned char character, unsigned int count, void *param)
                 unsigned int *back_addr, *cur_addr, back_offset, forward_offset;
                 /* Get the location of the opening bracket for this closing bracket */
                 if (codegen_param->loop_size == 0) exit(3);
-                back_addr = codegen_param->loop_stack[--codegen_param->loop_size];
+                back_addr = *(codegen_param->loop_stack + --codegen_param->loop_size);
                 cur_addr = (code_memory + (i * 2) + 1);
 
                 /* Determine the branching offsets for the two branch instructions of this bracket pair */
@@ -240,11 +240,21 @@ int main(int argc, char *argv[]) {
 
     /* Setup the codegen params */
     codegen_param.code_memory_pointer = &code_memory_pointer;
+    codegen_param.loop_stack = malloc(LOOP_STACK_SIZE);
     codegen_param.loop_size = 0;
 
     /* Run code generation on the input file */
     rewind(input_file);
     rle_read_file(input_file, rle_code_generate, &codegen_param);
+
+    /* Free the loop stack from codegen params */
+    free(codegen_param.loop_stack);
+
+    /* Check the loop stack size to make sure the code has no missing loop ends */
+    if (codegen_param.loop_size != 0) {
+        printf("Input code contains loops with missing ends\n");
+        return 1;
+    }
 
     /* Add the postamble code to the memory */  
     *code_memory_pointer++ = 0xe1a0d00b; /* mov sp, fp */
