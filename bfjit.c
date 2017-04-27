@@ -1,3 +1,6 @@
+#ifndef __arm__
+#error BrainfuckJIT currently only supports ARM
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
