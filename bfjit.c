@@ -217,6 +217,10 @@ int main(int argc, char *argv[]) {
     if (code_memory == MAP_FAILED) {
         printf("Unable to map JIT code memory\n");
         perror("mmap()");
+
+        /* Clean up used memory */
+        fclose(input_file);
+
         return 1;
     }
     code_memory_pointer = code_memory;
@@ -226,6 +230,11 @@ int main(int argc, char *argv[]) {
     jit_memory = (unsigned char *) malloc(JIT_MEMORY_SIZE);
     if (jit_memory == NULL) {
         printf("Unable to map JIT data memory\n");
+
+        /* Clean up used memory */
+        fclose(input_file);
+        munmap(code_memory, code_length);
+
         return 1;
     }
     memset(jit_memory, 0, JIT_MEMORY_SIZE);
@@ -246,6 +255,7 @@ int main(int argc, char *argv[]) {
     /* Run code generation on the input file */
     rewind(input_file);
     rle_read_file(input_file, rle_code_generate, &codegen_param);
+    fclose(input_file);
 
     /* Free the loop stack from codegen params */
     free(codegen_param.loop_stack);
@@ -253,6 +263,11 @@ int main(int argc, char *argv[]) {
     /* Check the loop stack size to make sure the code has no missing loop ends */
     if (codegen_param.loop_size != 0) {
         printf("Input code contains loops with missing ends\n");
+
+        /* Clean up used memory */
+        munmap(code_memory, code_length);
+        free(jit_memory);
+
         return 1;
     }
 
