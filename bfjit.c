@@ -124,14 +124,14 @@ void rle_code_generate(unsigned char character, unsigned int count, void *param)
             break;
         case '>':
             if (count > 0xfff) exit(2);
-            *(code_memory + 0) = 0xe4c40000 | (count & 0xfff); /* str r0, [r4], count */
-            *(code_memory + 1) = 0xe5d40000; /* ldr r0, [r4] */
+            *(code_memory + 0) = 0xe4c40000 | (count & 0xfff); /* strb r0, [r4], count */
+            *(code_memory + 1) = 0xe5d40000; /* ldrb r0, [r4] */
             *code_memory_pointer += 2;
             break;
         case '<':
             if (count > 0xfff) exit(2);
-            *(code_memory + 0) = 0xe4440000 | (count & 0xfff); /* str r0, [r4], -count */
-            *(code_memory + 1) = 0xe5d40000; /* ldr r0, [r4] */
+            *(code_memory + 0) = 0xe4440000 | (count & 0xfff); /* strb r0, [r4], -count */
+            *(code_memory + 1) = 0xe5d40000; /* ldrb r0, [r4] */
             *code_memory_pointer += 2;
             break;
         /* "[].," need to be repeated for every character */
@@ -168,26 +168,26 @@ void rle_code_generate(unsigned char character, unsigned int count, void *param)
         case '.':
             for (i = 0; i < count; i++) {
                 /* Run a systemcall write(stdout, jit_memory[current_cell], 1) */
-                *(code_memory + (i * 7) + 0) = 0xe5c40000; /* str r0, [r4] */           
+                *(code_memory + (i * 7) + 0) = 0xe5c40000; /* strb r0, [r4] */
                 *(code_memory + (i * 7) + 1) = 0xe3a07004; /* mov r7, #4 */
                 *(code_memory + (i * 7) + 2) = 0xe3a00001; /* mov r0, #1 */
                 *(code_memory + (i * 7) + 3) = 0xe1a01004; /* mov r1, r4 */
                 *(code_memory + (i * 7) + 4) = 0xe3a02001; /* mov r2, #1 */
                 *(code_memory + (i * 7) + 5) = 0xef000000; /* svc #0 */
-                *(code_memory + (i * 7) + 6) = 0xe5d40000; /* ldr r0, [r4] */
+                *(code_memory + (i * 7) + 6) = 0xe5d40000; /* ldrb r0, [r4] */
             }
             *code_memory_pointer += 7 * count;
             break;
         case ',':
             for (i = 0; i < count; i++) {
                 /* Run a systemcall read(stdin, jit_memory[current_cell], 1) */
-                *(code_memory + (i * 7) + 0) = 0xe5c40000; /* str r0, [r4] */
+                *(code_memory + (i * 7) + 0) = 0xe5c40000; /* strb r0, [r4] */
                 *(code_memory + (i * 7) + 1) = 0xe3a07003; /* mov r7, #3 */
                 *(code_memory + (i * 7) + 2) = 0xe3a00000; /* mov r0, #0 */
                 *(code_memory + (i * 7) + 3) = 0xe1a01004; /* mov r1, r4 */
                 *(code_memory + (i * 7) + 4) = 0xe3a02001; /* mov r2, #1 */
                 *(code_memory + (i * 7) + 5) = 0xef000000; /* svc #0 */
-                *(code_memory + (i * 7) + 6) = 0xe5d40000; /* ldr r0, [r4] */       
+                *(code_memory + (i * 7) + 6) = 0xe5d40000; /* ldrb r0, [r4] */
             }
             *code_memory_pointer += 7 * count;
             break;
