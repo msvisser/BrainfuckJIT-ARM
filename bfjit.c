@@ -260,7 +260,7 @@ int run_jit(runtime_flags_t *flags) {
 
     /* Setup the codegen params */
     codegen_param.code_memory_pointer = &code_memory_pointer;
-    codegen_param.loop_stack = malloc(flags->loop_stack_size);
+    codegen_param.loop_stack = malloc(flags->loop_stack_size * sizeof(unsigned int *));
     codegen_param.loop_size = 0;
     codegen_param.loop_max_size = flags->loop_stack_size;
 
