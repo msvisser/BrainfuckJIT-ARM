@@ -290,7 +290,7 @@ int run_jit(runtime_flags_t *flags) {
 
     if (flags->verbose) printf("Running the generated code!\n\n");
     /* Call the JIT generated code */
-    jit_function = (jit_function_t) (code_memory + 1);
+    jit_function = (jit_function_t) (size_t) (code_memory + 1);
     jit_function();
 
     /* Deallocate the code and data memory */
