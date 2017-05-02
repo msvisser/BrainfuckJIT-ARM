@@ -1,5 +1,5 @@
 # BrainfuckJIT-ARM
-This is a Just in Time compiler for Brainfuck that runs on the ARMv7 platform.
+This is a Just-in-Time compiler for Brainfuck that runs on the ARMv7 platform.
 It will do a very simple run length encoding to optimise the program and squash repeat operations into a single operation.
 
 ## Usage
@@ -44,7 +44,7 @@ Loops are a little more complex as they require keeping track of the offsets. In
     
     tst r0, #255
     bne .Lloopbegin
-.Lloopend
+.Lloopend:
 ```
 
 ### Input and Output
