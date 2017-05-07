@@ -113,23 +113,27 @@ void rle_code_generate(unsigned char character, unsigned int count, void *param)
     switch (character) {
         /* "+-><" can be repeated in the same instruction */
         case '+':
-            if (count > 0xff) exit(2);
             *(code_memory + 0) = 0xe2800000 | (count & 0xff); /* add r0, r0, count */
             *code_memory_pointer += 1;
             break;
         case '-':
-            if (count > 0xff) exit(2);
             *(code_memory + 0) = 0xe2400000 | (count & 0xff); /* sub r0, r0, count */
             *code_memory_pointer += 1;
             break;
         case '>':
-            if (count > 0xfff) exit(2);
+            if (count > 0xfff) {
+                printf("Move right count is too large (> 4095)\n");
+                exit(2);
+            }
             *(code_memory + 0) = 0xe4c40000 | (count & 0xfff); /* strb r0, [r4], count */
             *(code_memory + 1) = 0xe5d40000; /* ldrb r0, [r4] */
             *code_memory_pointer += 2;
             break;
         case '<':
-            if (count > 0xfff) exit(2);
+            if (count > 0xfff) {
+                printf("Move left count is too large (> 4095)\n");
+                exit(2);
+            }
             *(code_memory + 0) = 0xe4440000 | (count & 0xfff); /* strb r0, [r4], -count */
             *(code_memory + 1) = 0xe5d40000; /* ldrb r0, [r4] */
             *code_memory_pointer += 2;
@@ -142,7 +146,10 @@ void rle_code_generate(unsigned char character, unsigned int count, void *param)
 
                 /* Save the memory address of the branch instruction on the stack, so we
                    can fix the offset when we find the closing bracket */
-                if (codegen_param->loop_size >= codegen_param->loop_max_size) exit(3);
+                if (codegen_param->loop_size >= codegen_param->loop_max_size) {
+                    printf("Loop stack size exceeded, try running with a larger -l.\n");
+                    exit(3);
+                }
                 *(codegen_param->loop_stack + codegen_param->loop_size++) = (code_memory + (i * 2) + 1);
             }
             *code_memory_pointer += 2 * count;
@@ -151,13 +158,21 @@ void rle_code_generate(unsigned char character, unsigned int count, void *param)
             for (i = 0; i < count; i++) {
                 unsigned int *back_addr, *cur_addr, back_offset, forward_offset;
                 /* Get the location of the opening bracket for this closing bracket */
-                if (codegen_param->loop_size == 0) exit(3);
+                if (codegen_param->loop_size == 0) {
+                    printf("Closing a loop while there is no open loop.\n");
+                    exit(3);
+                }
                 back_addr = *(codegen_param->loop_stack + --codegen_param->loop_size);
                 cur_addr = (code_memory + (i * 2) + 1);
 
                 /* Determine the branching offsets for the two branch instructions of this bracket pair */
                 back_offset = ((unsigned int) back_addr - (unsigned int) cur_addr - 4) >> 2;
                 forward_offset = ((unsigned int) cur_addr - (unsigned int) back_addr - 4) >> 2;
+                if (!(back_offset < 0x007fffff || back_offset > 0xff800000) && 
+                    !(forward_offset < 0x007fffff || forward_offset > 0xff800000)) {
+                    printf("Loop jump requires offset outside of the 32MB jump range.\n");
+                    exit(3);
+                }
 
                 *(code_memory + (i * 2) + 0) = 0xe31000ff; /* tst r0, #255 */
                 *(code_memory + (i * 2) + 1) = 0x1a000000 | (back_offset & 0xffffff); /* bne offset */
