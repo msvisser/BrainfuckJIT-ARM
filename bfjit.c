@@ -95,10 +95,8 @@ void rle_determine_code_length(unsigned char character, unsigned int count, void
             *code_length += 2 * count * sizeof(unsigned int);
             break;
         case '.':
-            *code_length += (5 + (2 * count)) * sizeof(unsigned int);
-            break;
         case ',':
-            *code_length += 7 * sizeof(unsigned int);
+            *code_length += (5 + (2 * count)) * sizeof(unsigned int);
             break;
     }
 }
@@ -196,15 +194,17 @@ void rle_code_generate(unsigned char character, unsigned int count, void *param)
             *code_memory_pointer += 5 + (2 * count);
             break;
         case ',':
-            /* Run a systemcall read(stdin, jit_memory[current_cell], 1) */
             *(code_memory + 0) = 0xe5c40000; /* strb r0, [r4] */
             *(code_memory + 1) = 0xe3a07003; /* mov r7, #3 */
-            *(code_memory + 2) = 0xe3a00000; /* mov r0, #0 */
-            *(code_memory + 3) = 0xe1a01004; /* mov r1, r4 */
-            *(code_memory + 4) = 0xe3a02001; /* mov r2, #1 */
-            *(code_memory + 5) = 0xef000000; /* svc #0 */
-            *(code_memory + 6) = 0xe5d40000; /* ldrb r0, [r4] */
-            *code_memory_pointer += 7;
+            *(code_memory + 2) = 0xe1a01004; /* mov r1, r4 */
+            *(code_memory + 3) = 0xe3a02001; /* mov r2, #1 */
+            for (i = 0; i < count; i++) {
+                /* Run a systemcall read(stdin, jit_memory[current_cell], 1) */
+                *(code_memory + 4 + (i * 2) + 0) = 0xe3a00000; /* mov r0, #0 */
+                *(code_memory + 4 + (i * 2) + 1) = 0xef000000; /* svc #0 */
+            }
+            *(code_memory + 4 + (i * 2) + 0) = 0xe5d40000; /* ldrb r0, [r4] */
+            *code_memory_pointer += 5 + (2 * count);
             break;
     }
 }
