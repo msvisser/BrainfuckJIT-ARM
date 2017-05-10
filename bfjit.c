@@ -15,7 +15,7 @@
 #define JIT_MEMORY_SIZE 30000
 
 /* Function types for the RLE callback and the actual JIT function */
-typedef void (*rle_callback_t)(unsigned char, unsigned int, void *);
+typedef int (*rle_callback_t)(unsigned char, unsigned int, void *);
 typedef void (*jit_function_t)(void);
 
 /* Structure for passing the code generation data to the RLE function */
@@ -36,12 +36,13 @@ typedef struct {
 
 /* Read all characters from a file and call the handle_char callback for every
    sequence of equal characters, effectively RLEing the input file */
-void rle_read_file(FILE *file, rle_callback_t handle_char, void *param) {
+int rle_read_file(FILE *file, rle_callback_t handle_char, void *param) {
     unsigned char *input_buffer;
     unsigned int read_length;
     unsigned char last_character, this_character;
     unsigned int last_count;
     unsigned int i;
+    int return_value;
 
     /* Allocate a buffer for the input */
     input_buffer = malloc(INPUT_BUFFER_SIZE);
@@ -57,7 +58,11 @@ void rle_read_file(FILE *file, rle_callback_t handle_char, void *param) {
         for (i = 0; i < read_length; i++) {
             this_character = *(input_buffer + i);
             if (this_character != last_character) {
-                handle_char(last_character, last_count, param);
+                return_value = handle_char(last_character, last_count, param);
+                if (return_value != 0) {
+                    free(input_buffer);
+                    return return_value;
+                }
                 last_character = this_character;
                 last_count = 1;
             } else {
@@ -67,16 +72,21 @@ void rle_read_file(FILE *file, rle_callback_t handle_char, void *param) {
     } while (read_length);
     /* Finish up final characters */
     if (last_count > 0) {
-        handle_char(last_character, last_count, param);
+        return_value = handle_char(last_character, last_count, param);
+        if (return_value != 0) {
+            free(input_buffer);
+            return return_value;
+        }
     }
 
     /* Deallocate the input buffer */
     free(input_buffer);
+    return 0;
 }
 
 /* Callback function for rle_read_file which will calculate the total number of instructions
    this program will take once compiled */
-void rle_determine_code_length(unsigned char character, unsigned int count, void *param) {
+int rle_determine_code_length(unsigned char character, unsigned int count, void *param) {
     unsigned int *code_length = (unsigned int *) param;
     /* Add number of bytes to the parameter base on character and count */
     switch (character) {
@@ -99,11 +109,13 @@ void rle_determine_code_length(unsigned char character, unsigned int count, void
             *code_length += (5 + (2 * count)) * sizeof(unsigned int);
             break;
     }
+
+    return 0;
 }
 
 /* Callback function for rle_read_file which will actually do the code generation on the file, 
    this function requires an instance of codegen_param_t as input parameter */
-void rle_code_generate(unsigned char character, unsigned int count, void *param) {
+int rle_code_generate(unsigned char character, unsigned int count, void *param) {
     codegen_param_t *codegen_param = (codegen_param_t *) param;
     unsigned int **code_memory_pointer = codegen_param->code_memory_pointer;
     unsigned int *code_memory = *code_memory_pointer;
@@ -123,7 +135,7 @@ void rle_code_generate(unsigned char character, unsigned int count, void *param)
         case '>':
             if (count > 0xfff) {
                 printf("Move right count is too large (> 4095)\n");
-                exit(2);
+                return 2;
             }
             *(code_memory + 0) = 0xe4c40000 | (count & 0xfff); /* strb r0, [r4], count */
             *(code_memory + 1) = 0xe5d40000; /* ldrb r0, [r4] */
@@ -132,7 +144,7 @@ void rle_code_generate(unsigned char character, unsigned int count, void *param)
         case '<':
             if (count > 0xfff) {
                 printf("Move left count is too large (> 4095)\n");
-                exit(2);
+                return 2;
             }
             *(code_memory + 0) = 0xe4440000 | (count & 0xfff); /* strb r0, [r4], -count */
             *(code_memory + 1) = 0xe5d40000; /* ldrb r0, [r4] */
@@ -148,7 +160,7 @@ void rle_code_generate(unsigned char character, unsigned int count, void *param)
                    can fix the offset when we find the closing bracket */
                 if (codegen_param->loop_size >= codegen_param->loop_max_size) {
                     printf("Loop stack size exceeded, try running with a larger -l.\n");
-                    exit(3);
+                    return 3;
                 }
                 *(codegen_param->loop_stack + codegen_param->loop_size++) = (code_memory + (i * 2) + 1);
             }
@@ -160,7 +172,7 @@ void rle_code_generate(unsigned char character, unsigned int count, void *param)
                 /* Get the location of the opening bracket for this closing bracket */
                 if (codegen_param->loop_size == 0) {
                     printf("Closing a loop while there is no open loop.\n");
-                    exit(3);
+                    return 3;
                 }
                 back_addr = *(codegen_param->loop_stack + --codegen_param->loop_size);
                 cur_addr = (code_memory + (i * 2) + 1);
@@ -171,7 +183,7 @@ void rle_code_generate(unsigned char character, unsigned int count, void *param)
                 if (!(back_offset < 0x007fffff || back_offset > 0xff800000) && 
                     !(forward_offset < 0x007fffff || forward_offset > 0xff800000)) {
                     printf("Loop jump requires offset outside of the 32MB jump range.\n");
-                    exit(3);
+                    return 3;
                 }
 
                 *(code_memory + (i * 2) + 0) = 0xe31000ff; /* tst r0, #255 */
@@ -207,11 +219,14 @@ void rle_code_generate(unsigned char character, unsigned int count, void *param)
             *code_memory_pointer += 5 + (2 * count);
             break;
     }
+
+    return 0;
 }
 
 int run_jit(runtime_flags_t *flags) {
     /* Input variables */
     FILE *input_file;
+    int rle_return_value;
     /* JIT variables */
     unsigned int code_length;
     unsigned int *code_memory;
@@ -232,7 +247,13 @@ int run_jit(runtime_flags_t *flags) {
 
     if (flags->verbose) printf("Determining the output code length\n");
     /* Read the input and determine the code size */
-    rle_read_file(input_file, rle_determine_code_length, &code_length);
+    rle_return_value = rle_read_file(input_file, rle_determine_code_length, &code_length);
+    /* Check if there was an error determining the code length */
+    if (rle_return_value != 0) {
+        /* Clean up used memory */
+        fclose(input_file);
+        return rle_return_value;
+    }
 
     /* Increase the code length to allow for pre- and postamble */
     code_length += 8 * sizeof(unsigned int);
@@ -281,11 +302,20 @@ int run_jit(runtime_flags_t *flags) {
 
     /* Run code generation on the input file */
     rewind(input_file);
-    rle_read_file(input_file, rle_code_generate, &codegen_param);
+    rle_return_value = rle_read_file(input_file, rle_code_generate, &codegen_param);
     fclose(input_file);
 
     /* Free the loop stack from codegen params */
     free(codegen_param.loop_stack);
+
+    /* Check if the code generation failed */
+    if (rle_return_value != 0) {
+        /* Clean up used memory */
+        munmap(code_memory, code_length);
+        free(jit_memory);
+        
+        return rle_return_value;
+    }
 
     /* Check the loop stack size to make sure the code has no missing loop ends */
     if (codegen_param.loop_size != 0) {
