@@ -272,7 +272,7 @@ int run_jit(runtime_flags_t *flags) {
 
     if (flags->verbose) printf("Allocating memory for the runtime data\n");
     /* Allocate memory for the code to use during execution */
-    jit_memory = (unsigned char *) malloc(flags->jit_memory_size);
+    jit_memory = (unsigned char *) calloc(flags->jit_memory_size, sizeof(unsigned char));
     if (jit_memory == NULL) {
         printf("Unable to map JIT data memory\n");
 
@@ -282,7 +282,6 @@ int run_jit(runtime_flags_t *flags) {
 
         return 1;
     }
-    memset(jit_memory, 0, flags->jit_memory_size);
 
     if (flags->verbose) printf("Compiling code into machine code\n");
     /* Add the preamble code to the memory */
