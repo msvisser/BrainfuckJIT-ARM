@@ -104,7 +104,7 @@ int rle_determine_code_length(unsigned char character, unsigned int count, void 
             break;
         case '.':
         case ',':
-            *code_length += (5 + (2 * count)) * sizeof(unsigned int);
+            *code_length += (4 + (2 * count)) * sizeof(unsigned int);
             break;
     }
 
@@ -135,8 +135,8 @@ int rle_code_generate(unsigned char character, unsigned int count, void *param) 
                 printf("Move right count is too large (> 4095)\n");
                 return 2;
             }
-            *(code_memory + 0) = 0xe4c40000 | (count & 0xfff); /* strb r0, [r4], count */
-            *(code_memory + 1) = 0xe5d40000; /* ldrb r0, [r4] */
+            *(code_memory + 0) = 0xe4c10000 | (count & 0xfff); /* strb r0, [r1], count */
+            *(code_memory + 1) = 0xe5d10000; /* ldrb r0, [r1] */
             *code_memory_pointer += 2;
             break;
         case '<':
@@ -144,8 +144,8 @@ int rle_code_generate(unsigned char character, unsigned int count, void *param) 
                 printf("Move left count is too large (> 4095)\n");
                 return 2;
             }
-            *(code_memory + 0) = 0xe4440000 | (count & 0xfff); /* strb r0, [r4], -count */
-            *(code_memory + 1) = 0xe5d40000; /* ldrb r0, [r4] */
+            *(code_memory + 0) = 0xe4410000 | (count & 0xfff); /* strb r0, [r1], -count */
+            *(code_memory + 1) = 0xe5d10000; /* ldrb r0, [r1] */
             *code_memory_pointer += 2;
             break;
         /* "[].," need to be repeated for every character */
@@ -191,30 +191,28 @@ int rle_code_generate(unsigned char character, unsigned int count, void *param) 
             *code_memory_pointer += 2 * count;
             break;
         case '.':
-            *(code_memory + 0) = 0xe5c40000; /* strb r0, [r4] */
+            *(code_memory + 0) = 0xe5c10000; /* strb r0, [r1] */
             *(code_memory + 1) = 0xe3a07004; /* mov r7, #4 */
-            *(code_memory + 2) = 0xe1a01004; /* mov r1, r4 */
-            *(code_memory + 3) = 0xe3a02001; /* mov r2, #1 */
+            *(code_memory + 2) = 0xe3a02001; /* mov r2, #1 */
             for (i = 0; i < count; i++) {
                 /* Run a systemcall write(stdout, jit_memory[current_cell], 1) */
-                *(code_memory + 4 + (i * 2) + 0) = 0xe3a00001; /* mov r0, #1 */
-                *(code_memory + 4 + (i * 2) + 1) = 0xef000000; /* svc #0 */
+                *(code_memory + 3 + (i * 2) + 0) = 0xe3a00001; /* mov r0, #1 */
+                *(code_memory + 3 + (i * 2) + 1) = 0xef000000; /* svc #0 */
             }
-            *(code_memory + 4 + (i * 2) + 0) = 0xe5d40000; /* ldrb r0, [r4] */
-            *code_memory_pointer += 5 + (2 * count);
+            *(code_memory + 3 + (i * 2) + 0) = 0xe5d10000; /* ldrb r0, [r1] */
+            *code_memory_pointer += 4 + (2 * count);
             break;
         case ',':
-            *(code_memory + 0) = 0xe5c40000; /* strb r0, [r4] */
+            *(code_memory + 0) = 0xe5c10000; /* strb r0, [r1] */
             *(code_memory + 1) = 0xe3a07003; /* mov r7, #3 */
-            *(code_memory + 2) = 0xe1a01004; /* mov r1, r4 */
-            *(code_memory + 3) = 0xe3a02001; /* mov r2, #1 */
+            *(code_memory + 2) = 0xe3a02001; /* mov r2, #1 */
             for (i = 0; i < count; i++) {
                 /* Run a systemcall read(stdin, jit_memory[current_cell], 1) */
-                *(code_memory + 4 + (i * 2) + 0) = 0xe3a00000; /* mov r0, #0 */
-                *(code_memory + 4 + (i * 2) + 1) = 0xef000000; /* svc #0 */
+                *(code_memory + 3 + (i * 2) + 0) = 0xe3a00000; /* mov r0, #0 */
+                *(code_memory + 3 + (i * 2) + 1) = 0xef000000; /* svc #0 */
             }
-            *(code_memory + 4 + (i * 2) + 0) = 0xe5d40000; /* ldrb r0, [r4] */
-            *code_memory_pointer += 5 + (2 * count);
+            *(code_memory + 3 + (i * 2) + 0) = 0xe5d10000; /* ldrb r0, [r1] */
+            *code_memory_pointer += 4 + (2 * count);
             break;
     }
 
@@ -254,7 +252,7 @@ int run_jit(runtime_flags_t *flags) {
     }
 
     /* Increase the code length to allow for pre- and postamble */
-    code_length += 8 * sizeof(unsigned int);
+    code_length += 6 * sizeof(unsigned int);
 
     if (flags->verbose) printf("Allocating memory for the output code\n");
     /* Allocate code memory which is writable and executable */     
@@ -286,10 +284,9 @@ int run_jit(runtime_flags_t *flags) {
     if (flags->verbose) printf("Compiling code into machine code\n");
     /* Add the preamble code to the memory */
     *code_memory_pointer++ = (unsigned int) jit_memory;
-    *code_memory_pointer++ = 0xe92d4890; /* push {r4, r7, fp, lr} */
-    *code_memory_pointer++ = 0xe1a0b00d; /* mov fp, sp */
-    *code_memory_pointer++ = 0xe51f4014; /* ldr r4, [pc, #-20] */
-    *code_memory_pointer++ = 0xe5d40000; /* ldrb r0, [r4] */
+    *code_memory_pointer++ = 0xe92d4080; /* push {r7, lr} */
+    *code_memory_pointer++ = 0xe51f1010; /* ldr r1, [pc, #-16] */
+    *code_memory_pointer++ = 0xe5d10000; /* ldrb r0, [r1] */
 
     /* Setup the codegen params */
     codegen_param.code_memory_pointer = &code_memory_pointer;
@@ -326,8 +323,7 @@ int run_jit(runtime_flags_t *flags) {
     }
 
     /* Add the postamble code to the memory */  
-    *code_memory_pointer++ = 0xe1a0d00b; /* mov sp, fp */
-    *code_memory_pointer++ = 0xe8bd4890; /* pop {r4, r7, fp, lr} */
+    *code_memory_pointer++ = 0xe8bd4080; /* pop {r7, lr} */
     *code_memory_pointer++ = 0xe12fff1e; /* bx lr */
 
     if (flags->verbose) printf("Running the generated code!\n\n");
