@@ -11,14 +11,13 @@ Finally you can change the compilers maximum loop depth with the `-l` flag, as f
 THe JIT compiler will run a very simple RLE scheme on the input data just combining multiple repeating characters. The characters `+`, `-`, `>` and `<` can be executed multiple times in one instruction. While `[`, `]`, `.` and `,` just have to be repeated multiple times. Below the equivalent ARM assembly is shown for the generated program.
 
 ### Preamble
-First of all the beginning of the function is set up. Here we push some registers on the stack and load the address of the memory block into `r4`. Finally we load `r0` with the value of the cell at `r4`, `r0` is used as a temporary register, which will hold the value of the current cell.
+First of all the beginning of the function is set up. Here we push some registers on the stack and load the address of the memory block into `r1`. Finally we load `r0` with the value of the cell at `r1`, `r0` is used as a temporary register, which will hold the value of the current cell.
 ```asm
     .word cells_memory_address
 main:
-    push {r4, r7, fp, lr}
-    mov fp, sp
-    ldr r4, [pc, #-20]
-    ldrb r0, [r4]
+    push {r7, lr}
+    ldr r1, [pc, #-16]
+    ldrb r0, [r1]
 ```
 
 ### Adding and Subtracting
@@ -29,10 +28,10 @@ Adding and subtracting simply operate on `r0` as it contains the value of the cu
 ```
 
 ### Moving left and right
-Moving around requires the value in `r0` to be stored in memory, as we are changing the current cell. After that we will need to move the pointer in `r4` based on the number of move instructions. Finally we need to load the new value into `r0`. We can optimise the store and move instruction into one, as ARM allows postincrementing. In this case count can be either positive or negative, based on the direction of movement.
+Moving around requires the value in `r0` to be stored in memory, as we are changing the current cell. After that we will need to move the pointer in `r1` based on the number of move instructions. Finally we need to load the new value into `r0`. We can optimise the store and move instruction into one, as ARM allows postincrementing. In this case count can be either positive or negative, based on the direction of movement.
 ```asm
-    strb r0, [r4], #count
-    ldrb r0, [r4]
+    strb r0, [r1], #count
+    ldrb r0, [r1]
 ```
 
 ### Loops
@@ -48,33 +47,30 @@ Loops are a little more complex as they require keeping track of the offsets. In
 ```
 
 ### Input and Output
-Input and output is handled by running systemcalls for read and write. Before we can call such a systemcall the value in `r0` has to be stored in memory, otherwise the systemcall cannot access it. After that the systemcall is executed. Finally we have to load the value for `r0` again from memory, as the systemcall trashes the value in `r0`.
+Input and output is handled by running systemcalls for read and write. Before we can call such a systemcall the value in `r0` has to be stored in memory, otherwise the systemcall cannot access it. Then we set up the systemcall parameters. `r7` will contain the systemcall number, `r0` the file descriptor, `r1` the pointer to the data to print, which convienently is already there, and `r2` will contain the number of bytes to read or write. After that the systemcall is executed. Finally we have to load the value for `r0` again from memory, as the systemcall trashes the value in `r0`.
 
 __Input:__
 ```asm
-    strb r0, [r4]
+    strb r0, [r1]
     mov r7. #3
     mov r0, #0
-    mov r1, r4
     mov r2, #1
     svc #0
-    ldrb r0, [r4]
+    ldrb r0, [r1]
 ```
 __Output:__
 ```asm
-    strb r0, [r4]
+    strb r0, [r1]
     mov r7. #4
     mov r0, #1
-    mov r1, r4
     mov r2, #1
     svc #0
-    ldrb r0, [r4]
+    ldrb r0, [r1]
 ```
 
 ### Postamble
-Finally the program has to return control back to the JIT compiler. Therefore we need a postamble, which corrects `sp` and pops the registers that were pushed in the preamble.
+Finally the program has to return control back to the JIT compiler. Therefore we need a postamble, which pops the registers that were pushed in the preamble and returns.
 ```asm
-    mov sp, fp
-    pop {r4, r7, fp, lr}
+    pop {r7, lr}
     bx lr
 ```
