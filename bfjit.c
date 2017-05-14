@@ -55,8 +55,12 @@ int rle_read_file(FILE *file, rle_callback_t handle_char, void *param) {
         /* Iterate over all characters that were read */
         for (i = 0; i < read_length; i++) {
             this_character = *(input_buffer + i);
+
+            /* If the character is different from the last character, call the
+               callback and set the new character */
             if (this_character != last_character) {
                 return_value = handle_char(last_character, last_count, param);
+                /* If the callback returned an error state stop reading */
                 if (return_value != 0) {
                     free(input_buffer);
                     return return_value;
@@ -67,7 +71,7 @@ int rle_read_file(FILE *file, rle_callback_t handle_char, void *param) {
                 last_count++;
             }
         }
-    } while (read_length);
+    } while (read_length != 0);
     /* Finish up final characters */
     if (last_count > 0) {
         return_value = handle_char(last_character, last_count, param);
