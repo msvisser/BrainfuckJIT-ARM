@@ -258,6 +258,7 @@ int run_jit(runtime_flags_t *flags) {
     /* Increase the code length to allow for pre- and postamble */
     code_length += 6 * sizeof(unsigned int);
 
+    if (flags->verbose >= 2) printf("Generated code will be %u bytes, %u instructions\n", code_length, code_length / sizeof(unsigned int));
     if (flags->verbose) printf("Allocating memory for the output code\n");
     /* Allocate code memory which is writable and executable */     
     code_memory = (unsigned int *) mmap(NULL, code_length, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON | MAP_PRIVATE, -1, 0);
@@ -330,6 +331,7 @@ int run_jit(runtime_flags_t *flags) {
     *code_memory_pointer++ = 0xe8bd4080; /* pop {r7, lr} */
     *code_memory_pointer++ = 0xe12fff1e; /* bx lr */
 
+    if (flags->verbose >= 2) printf("Code pointer offset from start is %u bytes\n", (size_t) code_memory_pointer - (size_t) code_memory);
     if (flags->verbose) printf("Running the generated code!\n\n");
     /* Call the JIT generated code */
     jit_function = (jit_function_t) (size_t) (code_memory + 1);
@@ -369,7 +371,7 @@ void parse_arguments(int argc, char *argv[], runtime_flags_t *flags) {
                 exit(0);
             case 'v':
                 /* Set verbose mode */
-                flags->verbose = 1;
+                flags->verbose += 1;
                 break;
             case 'm':
                 /* Set the runtime memory size */
