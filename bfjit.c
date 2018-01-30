@@ -269,7 +269,7 @@ int run_jit(runtime_flags_t *flags) {
     if (flags->verbose >= 2) fprintf(stderr, "Generated code will be %u bytes, %u instructions\n", code_length, code_length / sizeof(unsigned int));
     if (flags->verbose) fprintf(stderr, "Allocating memory for the output code\n");
     /* Allocate code memory which is writable and executable */
-    code_memory = (unsigned int *) mmap(NULL, code_length, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON | MAP_PRIVATE, -1, 0);
+    code_memory = (unsigned int *) mmap(NULL, code_length, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
     if (code_memory == MAP_FAILED) {
         fprintf(stderr, "Unable to map JIT code memory\n");
         perror("mmap()");
