@@ -170,7 +170,9 @@ int rle_code_generate(unsigned char character, unsigned int count, void *param) 
             break;
         case ']':
             for (i = 0; i < count; i++) {
-                unsigned int *back_addr, *cur_addr, back_offset, forward_offset;
+                unsigned int *back_addr, *cur_addr;
+                int back_offset, forward_offset;
+                int back_in_range, forward_in_range;
                 /* Get the location of the opening bracket for this closing bracket */
                 if (codegen_param->loop_size == 0) {
                     printf("Closing a loop while there is no open loop.\n");
@@ -180,10 +182,12 @@ int rle_code_generate(unsigned char character, unsigned int count, void *param) 
                 cur_addr = (code_memory + (i * 2) + 1);
 
                 /* Determine the branching offsets for the two branch instructions of this bracket pair */
-                back_offset = ((unsigned int) back_addr - (unsigned int) cur_addr - 4) >> 2;
-                forward_offset = ((unsigned int) cur_addr - (unsigned int) back_addr - 4) >> 2;
-                if (!(back_offset < 0x007fffff || back_offset > 0xff800000) && 
-                    !(forward_offset < 0x007fffff || forward_offset > 0xff800000)) {
+                back_offset = (int)((unsigned int) back_addr - (unsigned int) cur_addr - 4) >> 2;
+                forward_offset = (int)((unsigned int) cur_addr - (unsigned int) back_addr - 4) >> 2;
+
+                back_in_range = back_offset >= -0x800000 && back_offset <= 0x7fffff;
+                forward_in_range = forward_offset >= -0x800000 && forward_offset <= 0x7fffff;
+                if (!back_in_range || !forward_in_range) {
                     printf("Loop jump requires offset outside of the 32MB jump range.\n");
                     return 3;
                 }
