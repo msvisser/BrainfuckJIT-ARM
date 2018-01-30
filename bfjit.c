@@ -115,7 +115,7 @@ int rle_determine_code_length(unsigned char character, unsigned int count, void 
     return 0;
 }
 
-/* Callback function for rle_read_file which will actually do the code generation on the file, 
+/* Callback function for rle_read_file which will actually do the code generation on the file,
    this function requires an instance of codegen_param_t as input parameter */
 int rle_code_generate(unsigned char character, unsigned int count, void *param) {
     codegen_param_t *codegen_param = (codegen_param_t *) param;
@@ -238,7 +238,7 @@ int run_jit(runtime_flags_t *flags) {
     codegen_param_t codegen_param;
     unsigned char *jit_memory;
     jit_function_t jit_function;
-    
+
     /* Open the input file */
     input_file = fopen(flags->input_file_string, "r");
     if (input_file == NULL) {
@@ -264,7 +264,7 @@ int run_jit(runtime_flags_t *flags) {
 
     if (flags->verbose >= 2) printf("Generated code will be %u bytes, %u instructions\n", code_length, code_length / sizeof(unsigned int));
     if (flags->verbose) printf("Allocating memory for the output code\n");
-    /* Allocate code memory which is writable and executable */     
+    /* Allocate code memory which is writable and executable */
     code_memory = (unsigned int *) mmap(NULL, code_length, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON | MAP_PRIVATE, -1, 0);
     if (code_memory == MAP_FAILED) {
         printf("Unable to map JIT code memory\n");
@@ -316,7 +316,7 @@ int run_jit(runtime_flags_t *flags) {
         /* Clean up used memory */
         munmap(code_memory, code_length);
         free(jit_memory);
-        
+
         return rle_return_value;
     }
 
@@ -331,7 +331,7 @@ int run_jit(runtime_flags_t *flags) {
         return 1;
     }
 
-    /* Add the postamble code to the memory */  
+    /* Add the postamble code to the memory */
     *code_memory_pointer++ = 0xe8bd4080; /* pop {r7, lr} */
     *code_memory_pointer++ = 0xe12fff1e; /* bx lr */
 
