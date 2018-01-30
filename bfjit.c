@@ -44,6 +44,10 @@ int rle_read_file(FILE *file, rle_callback_t handle_char, void *param) {
 
     /* Allocate a buffer for the input */
     input_buffer = malloc(INPUT_BUFFER_SIZE);
+    if (input_buffer == NULL) {
+        printf("Unable to allocate memory for the input buffer\n");
+        return 1;
+    }
 
     /* Set up the RLE variables */
     last_character = '\0';
@@ -302,6 +306,17 @@ int run_jit(runtime_flags_t *flags) {
     codegen_param.loop_stack = malloc(flags->loop_stack_size * sizeof(unsigned int *));
     codegen_param.loop_size = 0;
     codegen_param.loop_max_size = flags->loop_stack_size;
+
+    if (codegen_param.loop_stack == NULL) {
+        printf("Unable to allocate loop stack\n");
+
+        /* Clean up used memory */
+        fclose(input_file);
+        munmap(code_memory, code_length);
+        free(jit_memory);
+
+        return 1;
+    }
 
     /* Run code generation on the input file */
     rewind(input_file);
