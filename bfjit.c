@@ -45,7 +45,7 @@ int rle_read_file(FILE *file, rle_callback_t handle_char, void *param) {
     /* Allocate a buffer for the input */
     input_buffer = malloc(INPUT_BUFFER_SIZE);
     if (input_buffer == NULL) {
-        printf("Unable to allocate memory for the input buffer\n");
+        fprintf(stderr, "Unable to allocate memory for the input buffer\n");
         return 1;
     }
 
@@ -140,7 +140,7 @@ int rle_code_generate(unsigned char character, unsigned int count, void *param) 
             break;
         case '>':
             if (count > 0xfff) {
-                printf("Move right count is too large (> 4095)\n");
+                fprintf(stderr, "Move right count is too large (> 4095)\n");
                 return 2;
             }
             *(code_memory + 0) = 0xe4c10000 | (count & 0xfff); /* strb r0, [r1], count */
@@ -149,7 +149,7 @@ int rle_code_generate(unsigned char character, unsigned int count, void *param) 
             break;
         case '<':
             if (count > 0xfff) {
-                printf("Move left count is too large (> 4095)\n");
+                fprintf(stderr, "Move left count is too large (> 4095)\n");
                 return 2;
             }
             *(code_memory + 0) = 0xe4410000 | (count & 0xfff); /* strb r0, [r1], -count */
@@ -165,7 +165,7 @@ int rle_code_generate(unsigned char character, unsigned int count, void *param) 
                 /* Save the memory address of the branch instruction on the stack, so we
                    can fix the offset when we find the closing bracket */
                 if (codegen_param->loop_size >= codegen_param->loop_max_size) {
-                    printf("Loop stack size exceeded, try running with a larger -l.\n");
+                    fprintf(stderr, "Loop stack size exceeded, try running with a larger -l.\n");
                     return 3;
                 }
                 *(codegen_param->loop_stack + codegen_param->loop_size++) = (code_memory + (i * 2) + 1);
@@ -179,7 +179,7 @@ int rle_code_generate(unsigned char character, unsigned int count, void *param) 
                 int back_in_range, forward_in_range;
                 /* Get the location of the opening bracket for this closing bracket */
                 if (codegen_param->loop_size == 0) {
-                    printf("Closing a loop while there is no open loop.\n");
+                    fprintf(stderr, "Closing a loop while there is no open loop.\n");
                     return 3;
                 }
                 back_addr = *(codegen_param->loop_stack + --codegen_param->loop_size);
@@ -192,7 +192,7 @@ int rle_code_generate(unsigned char character, unsigned int count, void *param) 
                 back_in_range = back_offset >= -0x800000 && back_offset <= 0x7fffff;
                 forward_in_range = forward_offset >= -0x800000 && forward_offset <= 0x7fffff;
                 if (!back_in_range || !forward_in_range) {
-                    printf("Loop jump requires offset outside of the 32MB jump range.\n");
+                    fprintf(stderr, "Loop jump requires offset outside of the 32MB jump range.\n");
                     return 3;
                 }
 
@@ -246,14 +246,14 @@ int run_jit(runtime_flags_t *flags) {
     /* Open the input file */
     input_file = fopen(flags->input_file_string, "r");
     if (input_file == NULL) {
-        printf("Could not open file\n");
+        fprintf(stderr, "Could not open file\n");
         return 1;
     }
 
     /* Reset code length */
     code_length = 0;
 
-    if (flags->verbose) printf("Determining the output code length\n");
+    if (flags->verbose) fprintf(stderr, "Determining the output code length\n");
     /* Read the input and determine the code size */
     rle_return_value = rle_read_file(input_file, rle_determine_code_length, &code_length);
     /* Check if there was an error determining the code length */
@@ -266,12 +266,12 @@ int run_jit(runtime_flags_t *flags) {
     /* Increase the code length to allow for pre- and postamble */
     code_length += 6 * sizeof(unsigned int);
 
-    if (flags->verbose >= 2) printf("Generated code will be %u bytes, %u instructions\n", code_length, code_length / sizeof(unsigned int));
-    if (flags->verbose) printf("Allocating memory for the output code\n");
+    if (flags->verbose >= 2) fprintf(stderr, "Generated code will be %u bytes, %u instructions\n", code_length, code_length / sizeof(unsigned int));
+    if (flags->verbose) fprintf(stderr, "Allocating memory for the output code\n");
     /* Allocate code memory which is writable and executable */
     code_memory = (unsigned int *) mmap(NULL, code_length, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON | MAP_PRIVATE, -1, 0);
     if (code_memory == MAP_FAILED) {
-        printf("Unable to map JIT code memory\n");
+        fprintf(stderr, "Unable to map JIT code memory\n");
         perror("mmap()");
 
         /* Clean up used memory */
@@ -281,11 +281,11 @@ int run_jit(runtime_flags_t *flags) {
     }
     code_memory_pointer = code_memory;
 
-    if (flags->verbose) printf("Allocating memory for the runtime data\n");
+    if (flags->verbose) fprintf(stderr, "Allocating memory for the runtime data\n");
     /* Allocate memory for the code to use during execution */
     jit_memory = (unsigned char *) calloc(flags->jit_memory_size, sizeof(unsigned char));
     if (jit_memory == NULL) {
-        printf("Unable to map JIT data memory\n");
+        fprintf(stderr, "Unable to map JIT data memory\n");
 
         /* Clean up used memory */
         fclose(input_file);
@@ -294,7 +294,7 @@ int run_jit(runtime_flags_t *flags) {
         return 1;
     }
 
-    if (flags->verbose) printf("Compiling code into machine code\n");
+    if (flags->verbose) fprintf(stderr, "Compiling code into machine code\n");
     /* Add the preamble code to the memory */
     *code_memory_pointer++ = (unsigned int) jit_memory;
     *code_memory_pointer++ = 0xe92d4080; /* push {r7, lr} */
@@ -308,7 +308,7 @@ int run_jit(runtime_flags_t *flags) {
     codegen_param.loop_max_size = flags->loop_stack_size;
 
     if (codegen_param.loop_stack == NULL) {
-        printf("Unable to allocate loop stack\n");
+        fprintf(stderr, "Unable to allocate loop stack\n");
 
         /* Clean up used memory */
         fclose(input_file);
@@ -337,7 +337,7 @@ int run_jit(runtime_flags_t *flags) {
 
     /* Check the loop stack size to make sure the code has no missing loop ends */
     if (codegen_param.loop_size != 0) {
-        printf("Input code contains loops with missing ends\n");
+        fprintf(stderr, "Input code contains loops with missing ends\n");
 
         /* Clean up used memory */
         munmap(code_memory, code_length);
@@ -350,8 +350,8 @@ int run_jit(runtime_flags_t *flags) {
     *code_memory_pointer++ = 0xe8bd4080; /* pop {r7, lr} */
     *code_memory_pointer++ = 0xe12fff1e; /* bx lr */
 
-    if (flags->verbose >= 2) printf("Code pointer offset from start is %u bytes\n", (size_t) code_memory_pointer - (size_t) code_memory);
-    if (flags->verbose) printf("Running the generated code!\n\n");
+    if (flags->verbose >= 2) fprintf(stderr, "Code pointer offset from start is %u bytes\n", (size_t) code_memory_pointer - (size_t) code_memory);
+    if (flags->verbose) fprintf(stderr, "Running the generated code!\n\n");
     /* Call the JIT generated code */
     jit_function = (jit_function_t) (size_t) (code_memory + 1);
     jit_function();
@@ -377,7 +377,7 @@ void parse_arguments(int argc, char *argv[], runtime_flags_t *flags) {
         switch (c) {
             case 'h':
                 /* Output a help message */
-                printf("Usage: %s [options...] infile\n"
+                fprintf(stderr, "Usage: %s [options...] infile\n"
                        "    -h        show this message\n"
                        "    -V        show the version\n"
                        "    -v        enable verbose printing\n"
@@ -386,7 +386,7 @@ void parse_arguments(int argc, char *argv[], runtime_flags_t *flags) {
                 exit(0);
             case 'V':
                 /* Output the software version */
-                printf("BrainfuckJIT-ARM by Michiel Visser\n");
+                fprintf(stderr, "BrainfuckJIT-ARM by Michiel Visser\n");
                 exit(0);
             case 'v':
                 /* Set verbose mode */
@@ -399,11 +399,11 @@ void parse_arguments(int argc, char *argv[], runtime_flags_t *flags) {
                     if (value > 0) {
                         flags->jit_memory_size = value;
                     } else {
-                        printf("Runtime memory size cannot be zero or negative: %ld\n", value);
+                        fprintf(stderr, "Runtime memory size cannot be zero or negative: %ld\n", value);
                         exit(1);
                     }
                 } else {
-                    printf("Runtime memory size is not a number: %s\n", optarg);
+                    fprintf(stderr, "Runtime memory size is not a number: %s\n", optarg);
                     exit(1);
                 }
                 break;
@@ -414,11 +414,11 @@ void parse_arguments(int argc, char *argv[], runtime_flags_t *flags) {
                     if (value > 0) {
                         flags->loop_stack_size = value;
                     } else {
-                        printf("Loop stack size cannot be zero or negative: %ld\n", value);
+                        fprintf(stderr, "Loop stack size cannot be zero or negative: %ld\n", value);
                         exit(1);
                     }
                 } else {
-                    printf("Loop stack size is not a number: %s\n", optarg);
+                    fprintf(stderr, "Loop stack size is not a number: %s\n", optarg);
                     exit(1);
                 }
                 break;
@@ -435,7 +435,7 @@ void parse_arguments(int argc, char *argv[], runtime_flags_t *flags) {
 
     /* Check there is only one non-flag input */
     if (argc - optind != 1) {
-        printf("Expecting a single input file\nFor information about usage use \"%s -h\"\n", argv[0]);
+        fprintf(stderr, "Expecting a single input file\nFor information about usage use \"%s -h\"\n", argv[0]);
         exit(1);
     } else {
         flags->input_file_string = argv[optind];
